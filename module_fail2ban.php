@@ -13,6 +13,8 @@ class Module_Fail2Ban extends Module
     const CONFIG_DEFAULT_MAX_RETRY = 3;
     const CONFIG_DEFAULT_BAN_TIME = 1800; //time in seconds
     const CONFIG_DEFAULT_FIND_TIME = 600; //time in seconds
+    
+    private $response;
 
 
     public function __construct($name, $context)
@@ -23,6 +25,7 @@ class Module_Fail2Ban extends Module
         $this->author = 'Simone Salerno';
         $this->need_instance = 0;
         $this->bootstrap = 1;
+        $this->response = '';
 
         parent::__construct($name, $context);
 
@@ -55,6 +58,53 @@ class Module_Fail2Ban extends Module
         $this->unregisterHook('displayBackOfficeTop');
         
         return parent::uninstall();
+    }
+    
+    /**
+     * Render configuration form
+     */
+    function getContent()
+    {
+        //update configuration values
+        if (Tools::isSubmit('submitFail2BanConfiguration')) {
+            $this->updateConfiguration(static::CONFIG_KEY_BAN_TIME, ['Validate', 'isUnsignedInt'], 'must be integer');
+            $this->updateConfiguration(static::CONFIG_KEY_FIND_TIME, ['Validate', 'isUnsignedInt'], 'must be integer');
+            $this->updateConfiguration(static::CONFIG_KEY_MAX_RETRY, ['Validate', 'isUnsignedInt'], 'must be integer');
+        }
+        
+        $input = array(
+            $this->input(static::CONFIG_KEY_BAN_TIME, 'Ban time', 'time employee cant login, even with right password, in seconds)'),
+            $this->input(static::CONFIG_KEY_MAX_RETRY, 'Max retry after which employee is banned'),
+            $this->input(static::CONFIG_KEY_FIND_TIME, 'Find time', 'time employee can fail MAX RETRY attemps before being banned, in seconds')
+        );
+        $form = array(
+            'form' => array(
+                'legend' => array(
+                    'title' => $this->displayName
+                ),
+                'input' => $input,
+                'submit' => array(
+                    'title' => $this->l('Save')
+                )
+            )
+        );
+        $helper = new HelperForm();
+        $helper->module = $this;
+        $helper->identifier = $this->identifier;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->name;
+        $helper->default_form_language = (int)Configuration::get('PS_LANG_DEFAULT');
+        $helper->allow_employee_form_lang = true;
+        $helper->toolbar_scroll = true;
+        $helper->title = $this->displayName;
+        $helper->submit_action = 'submitFail2BanConfiguration';
+        $helper->tpl_vars = array('fields_value' => array(
+            static::CONFIG_KEY_BAN_TIME => ConfigurationCore::get(static::CONFIG_KEY_BAN_TIME),
+            static::CONFIG_KEY_FIND_TIME => ConfigurationCore::get(static::CONFIG_KEY_FIND_TIME),
+            static::CONFIG_KEY_MAX_RETRY => ConfigurationCore::get(static::CONFIG_KEY_MAX_RETRY)
+        ));
+        
+        return $this->response . $helper->generateForm(array($form));
     }
 
     /**
@@ -147,6 +197,38 @@ class Module_Fail2Ban extends Module
         $accessStats = Db::getInstance()->getRow(str_replace('{DB_PREFIX}', _DB_PREFIX_, $query));
         
         return $accessStats ? strtotime($accessStats['access_time']) : 0;
+    }
+    
+    /**
+     * Shortcut to create input array
+     * @param string $name
+     * @param string $label
+     * @param string $hint
+     * @return array
+     */
+    private function input($name, $label, $hint = '')
+    {
+        $input = array('name' => $name, 'type' => 'text', 'label' => $this->l($label));
+        $hint && $input['hint'] = $hint;
+        
+        return $input;
+    }
+    
+    /**
+     * Update configuration via form
+     * @param string $name
+     * @param callable $validator
+     */
+    private function updateConfiguration($name, $validator = null, $msg = '')
+    {
+        $value = Tools::getValue($name);
+        
+        if ($validator === null || !is_callable($validator) || $validator($value)) {
+            ConfigurationCore::updateValue($name, $value);
+            $this->response .= $this->displayConfirmation(sprintf('%s updated', $name));
+        } else {
+            $this->response .= $this->displayError(sprintf('Error on [%s]: %s', $name, $msg));
+        }
     }
 
     /**
