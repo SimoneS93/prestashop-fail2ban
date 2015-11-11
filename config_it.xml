@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+	<name>module_fail2ban</name>
+	<displayName><![CDATA[Fail2Ban]]></displayName>
+	<version><![CDATA[1.0.0]]></version>
+	<description><![CDATA[Ban employee after consecutive login fails.]]></description>
+	<author><![CDATA[Simone Salerno]]></author>
+	<tab><![CDATA[administration]]></tab>
+	<is_configurable>0</is_configurable>
+	<need_instance>0</need_instance>
+	<limited_countries></limited_countries>
+</module>
